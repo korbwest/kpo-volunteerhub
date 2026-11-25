@@ -1,49 +1,136 @@
-# VolunteerHub
+# VolunteerHub — «Рядом»
 
-Веб-приложение для взаимодействия волонтёров и организаций.
+Веб-приложение для управления волонтёрскими проектами. Курсовой проект по дисциплине «Конструирование программного обеспечения».
 
-## Технологии
+## Возможности прототипа
 
-- Backend: Python, FastAPI, SQLAlchemy, PostgreSQL.
-- Frontend: React, TypeScript, Vite.
-- Проверки и сборка: GitHub Actions.
+- Регистрация и вход для волонтёра и организатора.
+- Просмотр и редактирование собственного профиля.
+- Удаление собственного аккаунта через API, если у него нет проектов.
+- Каталоги проектов и организаций, поиск, фильтры и постраничная навигация.
+- Создание и редактирование проектов организатором.
+- Публикация, возврат в черновик и архивация проектов.
+- Удаление собственных черновиков и опубликованных проектов через API.
+- Разграничение доступа: организатор управляет только своими проектами.
 
-## Работа с репозиторием
+Заявки на участие, уведомления, баллы и рейтинг волонтёров пока не реализованы. Архивные проекты доступны только для чтения. Изображения задаются ссылками; загрузка файлов не предусмотрена.
 
-Изменения выполняются в тематических ветках и принимаются в `main` через pull request.
-Сообщения коммитов оформляются по Conventional Commits. Способ слияния — Squash and merge.
+## Технологии и структура
 
-## Локальный запуск
+Backend: Python 3.11+, FastAPI, SQLAlchemy, Alembic, PostgreSQL.
+Frontend: React, TypeScript, Vite.
+Тесты: pytest, pytest-cov, Vitest, Testing Library.
 
-Требуются Python 3.11+, Node.js 22 и npm.
+```text
+backend/
+  app/          модели, схемы, серверная логика и маршруты API
+  migrations/   миграции Alembic
+  tests/        модульные тесты и проверки API
+frontend/
+  src/          страницы, компоненты, API-клиент и тесты
+docs/           правила работы с репозиторием
+compose.yaml    локальный запуск приложения и PostgreSQL
+```
+
+## Запуск приложения
+
+Нужны Git и Docker Compose v2 (например, Docker Desktop с Linux containers). Команды выполняются из корня репозитория.
+
+```powershell
+Copy-Item .env.example .env
+```
+
+В `.env` замените `POSTGRES_PASSWORD` и `SECRET_KEY` собственными случайными значениями. Для `SECRET_KEY` используйте не менее 32 символов. Файл `.env` исключён из Git.
+
+```powershell
+docker compose up --build -d
+docker compose ps
+```
+
+Откройте http://localhost:8080. Создайте аккаунт организатора, затем проект и опубликуйте его. В опубликованном каталоге проект будет доступен волонтёрам.
+
+Перед запуском API автоматически применяются миграции. PostgreSQL хранит данные в именованном томе. Для остановки с сохранением данных:
+
+```powershell
+docker compose down
+```
+
+Опция `-v` удаляет том с базой данных. При изменении порта одновременно измените `APP_PORT` и `APP_ORIGIN` в `.env`.
+
+## Локальные проверки
+
+Для проверок вне Docker нужны Python 3.11+ и Node.js 22 с npm. Установка зависимостей:
 
 ```powershell
 python -m venv .venv
-.venv/Scripts/python.exe -m pip install -c backend/requirements-dev.lock.txt -e "./backend[dev]"
-git config core.hooksPath .githooks
-cd backend
-../.venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8080
+.venv/Scripts/python -m pip install -c backend/requirements-dev.lock.txt -e './backend[dev]'
+Push-Location frontend
+npm.cmd ci --no-audit --no-fund
+Pop-Location
 ```
 
-Во втором терминале:
+Backend:
 
 ```powershell
-cd frontend
-npm ci
-npm run dev
+.venv/Scripts/ruff check backend
+.venv/Scripts/ruff format --check backend
+Push-Location backend
+../.venv/Scripts/python -m pytest --cov=app --cov-report=term-missing
+Pop-Location
 ```
 
-Текущая основа приложения содержит проверку доступности `GET /health` и стартовую страницу.
-Предметные функции добавляются отдельными изменениями.
+Без `TEST_DATABASE_URL` тесты используют временную SQLite. Это облегчённая проверка API: тест конкурентного доступа требует PostgreSQL и пропускается на SQLite.
 
-## Проверки
+Для интеграционных проверок задайте `TEST_DATABASE_URL` в формате `postgresql+psycopg://USER:PASSWORD@HOST:PORT/volunteerhub_test`, указывающий на отдельную тестовую базу. Имя должно содержать `test`. Тесты создают и удаляют таблицы: базу приложения использовать нельзя.
 
-В каталоге backend: `ruff check .`, `ruff format --check .`, `pytest --cov=app`.
-В каталоге frontend: `npm run lint`, `npm run format:check`, `npm run test:coverage`, `npm run build`.
-Инструменты Python запускаются из установленного виртуального окружения.
+Frontend:
 
-GitHub Actions запускает проверки при push и pull request, затем создаёт артефакт `prototype-build`.
-Метрики доступны в артефакте `quality-metrics`. На контрольных точках используется ручной запуск
-Quality с параметром `lab5`, `lab6`, `lab7` или `final`; вычисления выполняются автоматически.
+```powershell
+Push-Location frontend
+npm.cmd run lint
+npm.cmd run format:check
+npm.cmd run test:coverage
+npm.cmd run build
+Pop-Location
+```
 
-Подробности: [правила работы](docs/workflow.md), [методика метрик](docs/metrics.md).
+Команда сборки проверяет TypeScript и создаёт `frontend/dist`. Отчёт тестов сохраняется в `frontend/reports/junit.xml`, покрытие — в `frontend/coverage`.
+
+## Разработка
+
+### Удаление через Swagger при локальном запуске
+
+При запуске backend на `127.0.0.1:8080` и Vite на `127.0.0.1:5173` задайте
+backend переменную `APP_ORIGIN=http://127.0.0.1:5173`.
+Откройте Swagger через http://127.0.0.1:5173/docs: Vite проксирует документацию и API.
+
+Выполните `POST /api/auth/login` с учётными данными организатора. Браузер сохранит
+cookie сессии. Скопируйте `csrf_token` из ответа (или из `GET /api/auth/me`, если
+уже вошли). В `DELETE /api/projects/{project_id}` укажите ID проекта и этот токен
+в поле `X-CSRF-Token`. Успешное удаление возвращает `204` без тела ответа;
+повторное чтение удалённого проекта возвращает `404`.
+
+Удаление физическое и необратимое: запись удаляется из базы. Архивные проекты
+удалять нельзя (`409`). Чужой проект возвращает `404`, роль волонтёра — `403`.
+Кнопка удаления в пользовательском интерфейсе пока не предусмотрена.
+
+### Удаление профиля через Swagger
+
+Для удаления своего аккаунта в Swagger используйте `DELETE /api/profile`
+с `X-CSRF-Token`, полученным после входа. ID пользователя не передаётся:
+удаляется только аккаунт текущей сессии. Ответ `204` означает успешное удаление,
+после которого cookie очищается и вход под прежними данными становится невозможен.
+При наличии любых проектов, включая архивные, возвращается `409`; аккаунт
+и проекты сохраняются. Удаление аккаунта необратимо.
+
+### Порядок работы
+
+Используются GitHub Flow и Conventional Commits. Правила ветвления, коммитов и слияния описаны в [docs/git-workflow.md](docs/git-workflow.md).
+
+Workflow Quality выполняет проверку сообщений коммитов, линтеров, форматирования, тестов,
+покрытия и сборку при push и pull request. Все пять групп метрик, включая частоту коммитов,
+рассчитываются автоматически. Методика описана в [docs/metrics.md](docs/metrics.md).
+
+После клонирования включите локальный хук: `git config core.hooksPath .githooks`.
+Изменения принимаются в main через PR с успешными обязательными проверками и Squash and merge.
+Порядок настройки защиты и выпуска версии описан в [docs/workflow.md](docs/workflow.md).
