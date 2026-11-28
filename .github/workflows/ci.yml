@@ -167,6 +167,14 @@ jobs:
         with:
           name: frontend-reports
           path: reports/frontend
+      - name: HTML test results
+        if: always()
+        run: python scripts/html_report.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-html
+          path: reports/test-results.html
       - name: Aggregate
         env:
           STAGE: ${{ inputs.stage || 'change' }}

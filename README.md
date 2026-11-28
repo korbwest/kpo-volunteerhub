@@ -96,6 +96,25 @@ Pop-Location
 
 Команда сборки проверяет TypeScript и создаёт `frontend/dist`. Отчёт тестов сохраняется в `frontend/reports/junit.xml`, покрытие — в `frontend/coverage`.
 
+### Визуальный отчёт тестов
+
+В GitHub Actions после запуска Quality можно скачать артефакт `test-results-html`.
+Он также включён в `quality-metrics`. Ошибки тестов блокируют сборку.
+
+Локально сформируйте исходные результаты и HTML из корня проекта:
+
+```powershell
+Push-Location backend
+$env:TEST_DATABASE_URL = "sqlite://"
+../.venv/Scripts/python.exe -m pytest --junitxml=../reports/backend/junit.xml
+Pop-Location
+Push-Location frontend
+npm.cmd run test:coverage
+Pop-Location
+.venv/Scripts/python.exe scripts/html_report.py --frontend frontend/reports/junit.xml
+Start-Process reports/test-results.html
+```
+
 ## Разработка
 
 ### Удаление через Swagger при локальном запуске
